@@ -1,9 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, MessageReaction } = require('discord.js');
 const { token } = require('./config.json');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions] });
 
 client.commands = new Collection();
 
@@ -33,10 +33,36 @@ for (const file of eventFiles) {
 	const event = require(filePath);
 
 	if (event.once) {
-		client.once(event.name, (...args) => event.execute(...args));
+		client.once(event.name, (...args) => event.execute(...args, client));
 	} else {
-		client.on(event.name, (...args) => event.execute(...args));
+		client.on(event.name, (...args) => event.execute(...args, client));
 	}
 }
+
+client.on('raw', async packet => {
+	if (!['MESSAGE_REACTION_ADD', 'MESSAGE_REACTION_REMOVE'].includes(packet.t)) return;
+
+	const { d: data } = packet;
+	const channel = client.channels.cache.get(data.channel_id);
+
+	// Ignore messages that are already in the cache, since the event will fire anyway for them
+	if (channel.messages.cache.get(data.message_id)) return;
+
+	const user = await client.users.fetch(data.user_id);
+
+	channel.messages.fetch(data.message_id).then(message => {
+		const emoji = data.emoji.id ? `${data.emoji.name}:${data.emoji.id}` : data.emoji.name;
+		const reaction = message.reactions.resolve(emoji) || new MessageReaction(client, data, message);
+
+		if (reaction) reaction.users.cache.set(data.user_id, client.users.cache.get(data.user_id));
+
+		if (packet.t === 'MESSAGE_REACTION_ADD') {
+			client.emit('messageReactionAdd', reaction, user);
+		}
+		if (packet.t === 'MESSAGE_REACTION_REMOVE') {
+			client.emit('messageReactionRemove', reaction, user);
+		}
+	});
+});
 
 client.login(token);
