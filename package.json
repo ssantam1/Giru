@@ -13,5 +13,8 @@
     "discord.js": "^14.14.1",
     "sequelize": "^6.37.3",
     "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@types/sequelize": "^4.28.20"
   }
 }
