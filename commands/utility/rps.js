@@ -13,12 +13,14 @@ module.exports ={
         const challenger = interaction.user;
         const opponent = interaction.options.getUser('opponent');
 
+        console.log(`User ${interaction.user.tag} issued /rps ${opponent.tag}} (${interaction.channel.name})`);
+
         if (opponent.bot) {
             return interaction.reply({ content: 'You can\'t play against a bot!', ephemeral: true });
         }
 
         if (opponent.id === challenger.id) {
-            return interaction.reply({ content: 'You can\'t play against yourself!', ephemeral: true });
+            return interaction.reply({ content: 'Please don\'t play with yourself...', ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
