@@ -10,84 +10,102 @@ module.exports ={
                 .setRequired(true)),
 
     async execute(interaction) {
-        // Send an embed displaying game status
+        const challenger = interaction.user;
+        const opponent = interaction.options.getUser('opponent');
+
+        if (opponent.bot) {
+            return interaction.reply({ content: 'You can\'t play against a bot!', ephemeral: true });
+        }
+
+        if (opponent.id === challenger.id) {
+            return interaction.reply({ content: 'You can\'t play against yourself!', ephemeral: true });
+        }
+
         const embed = new EmbedBuilder()
             .setColor('White')
             .setTitle('Rock-Paper-Scissors')
             .setDescription('Waiting for both players to choose...');
 
-        const rock = new ButtonBuilder()
-            .setCustomId('rock')
-            .setLabel('Rock')
-            .setStyle(1);
-        
-        const paper = new ButtonBuilder()
-            .setCustomId('paper')
-            .setLabel('Paper')
-            .setStyle(1);
-
-        const scissors = new ButtonBuilder()
-            .setCustomId('scissors')
-            .setLabel('Scissors')
-            .setStyle(1);
-
         const row = new ActionRowBuilder()
-            .addComponents(rock, paper, scissors);
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('rock')
+                    .setLabel('Rock')
+                    .setStyle('Primary')
+                    .setEmoji('🪨'),
+                new ButtonBuilder()
+                    .setCustomId('paper')
+                    .setLabel('Paper')
+                    .setStyle('Primary')
+                    .setEmoji('📄'),
+                new ButtonBuilder()
+                    .setCustomId('scissors')
+                    .setLabel('Scissors')
+                    .setStyle('Primary')
+                    .setEmoji('✂️')
+            );
 
-        const game = await interaction.reply({
-            content: `<@${interaction.user.id}> challenged <@${interaction.options.getUser('opponent').id}> to Rock-Paper-Scissors!`,
+        const message = await interaction.reply({
+            content: `<@${challenger.id}> challenged <@${opponent.id}> to Rock-Paper-Scissors!`,
             embeds: [embed],
-            components: [row] });
-
-        const playerFilter = i => i.user.id === interaction.user.id || i.user.id === interaction.options.getUser('opponent').id;
+            components: [row],
+            fetchReply: true
+        });
         
-        const collector = game.createMessageComponentCollector({
+        const collector = message.createMessageComponentCollector({
             componentType: ComponentType.Button,
-            filter: playerFilter,
             time: 60_000 });
         
-        let responsesRecieved = 0;
+        const playerChoices = {};
 
         collector.on('collect', async i => {
-            responsesRecieved++;
-            if (responsesRecieved === 2) {
+            if (i.user.id !== challenger.id && i.user.id !== opponent.id) {
+                return i.reply({ content: 'You are not part of this game!', ephemeral: true });
+            }
+
+            if (playerChoices[i.user.id]) {
+                return i.reply({ content: 'You have already made a choice!', ephemeral: true });
+            }
+
+            playerChoices[i.user.id] = i.customId;
+
+            if (playerChoices[challenger.id] && playerChoices[opponent.id]) {
                 collector.stop();
                 await i.deferUpdate();
             } else {
-                if (i.user.id === interaction.user.id) {
-                    await i.update({ embeds: [embed.setDescription(`Waiting for ${interaction.options.getUser('opponent').tag} to choose...`)] });
-                } else {
-                    await i.update({ embeds: [embed.setDescription(`Waiting for ${interaction.user.tag} to choose...`)] });
-                }
+                let tag = i.user.id === challenger.id ? opponent.tag : challenger.tag;
+                await i.update({ embeds: [embed.setDescription(`Waiting for ${tag} to choose...`)] });
             }
         });
 
         collector.on('end', collected => {
-            const player1 = collected.find(i => i.user.id === interaction.user.id);
-            const player2 = collected.find(i => i.user.id === interaction.options.getUser('opponent').id);
+            const challengerSumbission = collected.find(i => i.user.id === challenger.id);
+            const opponentSubmission = collected.find(i => i.user.id === opponent.id);
 
-            if (!player1 || !player2) {
+            if (!challengerSumbission || !opponentSubmission) {
                 embed.setDescription('Game Cancelled:\nOne or more players did not make a choice in time.');
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
 
-            const player1Choice = player1.customId;
-            const player2Choice = player2.customId;
+            const challengerChoice = challengerSumbission.customId;
+            const opponentChoice = opponentSubmission.customId;
 
             let result;
-            if (player1Choice === player2Choice) {
+            if (challengerChoice === opponentChoice) {
                 result = 'It\'s a tie!';
             } else if (
-                (player1Choice === 'rock' && player2Choice === 'scissors') ||
-                (player1Choice === 'paper' && player2Choice === 'rock') ||
-                (player1Choice === 'scissors' && player2Choice === 'paper')
+                (challengerChoice === 'rock' && opponentChoice === 'scissors') ||
+                (challengerChoice === 'paper' && opponentChoice === 'rock') ||
+                (challengerChoice === 'scissors' && opponentChoice === 'paper')
             ) {
-                result = `${interaction.user.tag} wins!`;
+                result = `${challenger.tag} wins!`;
+                embed.setThumbnail(challenger.displayAvatarURL());
             } else {
-                result = `${interaction.options.getUser('opponent').tag} wins!`;
+                result = `${opponent.tag} wins!`;
+                embed.setThumbnail(opponent.displayAvatarURL());
             }
-
-            embed.setDescription(`${interaction.user.tag} chose ${player1Choice}\n${interaction.options.getUser('opponent').tag} chose ${player2Choice}\n\n${result}`);
+        
+            embed.setDescription(`${challenger.tag} chose ${challengerChoice}\n${opponent.tag} chose ${opponentChoice}\n\n${result}`);
             interaction.editReply({ embeds: [embed], components: [] });
         });
     }
