@@ -9,14 +9,15 @@ const sequelize = new Sequelize('database', 'user', 'password', {
 
 const Users = require('./models/users.js')(sequelize, Sequelize.DataTypes);
 
-function addCurrency(userId, amount) {
-    return Users.findOne({ where: { user_id: userId } }).then(user => {
-        if (user) {
-            user.currency += Number(amount);
-            return user.save();
-        }
-        return Users.create({ user_id: userId, balance: amount });
-    });
+async function addBalance(userId, amount) {
+    const user = await Users.findOne({ where: { user_id: userId } });
+
+    if (user) {
+        user.balance += Number(amount);
+        return user.save();
+    }
+
+    return await Users.create({ user_id: userId, balance: amount });
 }
 
 async function getBalance(userId) {
@@ -24,4 +25,4 @@ async function getBalance(userId) {
     return user ? user.balance : 0;
 }
 
-module.exports = { Users, addCurrency, getBalance };
+module.exports = { Users, addBalance, getBalance };
