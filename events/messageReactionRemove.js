@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { addBalance } = require('../dbObjects.js');
+const { updateScoreNickname } = require('../helpers.js');
 const { upvoteEmojiId, downvoteEmojiId } = require('../config.json');
 
 module.exports = {
@@ -19,12 +20,16 @@ module.exports = {
             return;
         }
 
+        const member = reaction.message.member || await reaction.message.guild.members.fetch(reaction.message.author.id);
+
         if (reaction.emoji.id === upvoteEmojiId) {
-            await addBalance(reaction.message.author.id, -1);
+            const newBalance = await addBalance(reaction.message.author.id, -1);
+            await updateScoreNickname(member, newBalance);
         }
 
         if (reaction.emoji.id === downvoteEmojiId) {
-            await addBalance(reaction.message.author.id, 1);
+            const newBalance = await addBalance(reaction.message.author.id, 1);
+            await updateScoreNickname(member, newBalance);
         }
 
         console.log(`${user.tag} removed their "${reaction.emoji.name}" reaction from a message.`);

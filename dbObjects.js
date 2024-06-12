@@ -14,15 +14,17 @@ async function addBalance(userId, amount) {
 
     if (user) {
         user.balance += Number(amount);
-        return user.save();
+        await user.save();
+        return user.balance;
     }
 
-    return await Users.create({ user_id: userId, balance: amount });
+    const newUser = await Users.create({ user_id: userId, balance: 100 + amount });
+    return newUser.balance
 }
 
 async function getBalance(userId) {
     const user = await Users.findOne({ where: { user_id: userId } });
-    return user ? user.balance : 0;
+    return user ? user.balance : 100;
 }
 
 module.exports = { Users, addBalance, getBalance };
