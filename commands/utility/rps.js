@@ -1,5 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ComponentType } = require('discord.js');
 
+const emojis = {
+    'rock': '🪨',
+    'paper': '📄',
+    'scissors': '✂️'
+};
+
 module.exports ={
     data: new SlashCommandBuilder()
         .setName('rps')
@@ -13,20 +19,24 @@ module.exports ={
         const challenger = interaction.user;
         const opponent = interaction.options.getUser('opponent');
 
-        console.log(`User ${interaction.user.tag} issued /rps ${opponent.tag}} (${interaction.channel.name})`);
+        console.log(`User ${interaction.user.tag} issued /rps ${opponent.tag} (${interaction.channel.name})`);
 
         if (opponent.bot) {
             return interaction.reply({ content: 'You can\'t play against a bot!', ephemeral: true });
         }
 
-        if (opponent.id === challenger.id) {
-            return interaction.reply({ content: 'Please don\'t play with yourself...', ephemeral: true });
-        }
+        //if (opponent.id === challenger.id) {
+        //    return interaction.reply({ content: 'Please don\'t play with yourself...', ephemeral: true });
+        //}
 
         const embed = new EmbedBuilder()
             .setColor('White')
-            .setTitle('Rock-Paper-Scissors')
-            .setDescription('Waiting for both players to choose...');
+            .setTitle('__Rock-Paper-Scissors__')
+            .addFields(
+                { name: challenger.tag + ':', value: 'Choosing...', inline: true },
+                { name: opponent.tag + ':', value: 'Choosing...', inline: true }
+            )
+            .setDescription('Waiting for both players to select their move...');
 
         const row = new ActionRowBuilder()
             .addComponents(
@@ -75,8 +85,9 @@ module.exports ={
                 collector.stop();
                 await i.deferUpdate();
             } else {
-                let tag = i.user.id === challenger.id ? opponent.tag : challenger.tag;
-                await i.update({ embeds: [embed.setDescription(`Waiting for ${tag} to choose...`)] });
+                const field = embed.data.fields.find(f => f.name === i.user.tag + ':');
+                field.value = 'Ready!';
+                await i.update({ embeds: [embed] });
             }
         });
 
@@ -85,29 +96,40 @@ module.exports ={
             const opponentSubmission = collected.find(i => i.user.id === opponent.id);
 
             if (!challengerSumbission || !opponentSubmission) {
-                embed.setDescription('Game Cancelled:\nOne or more players did not make a choice in time.');
+                embed.setDescription('🚫 Game Cancelled: Player(s) did not choose in time.')
+                    .setFooter({ iconURL: interaction.client.user.displayAvatarURL(), text: 'Game Cancelled' })
+                    .setTimestamp();
                 return interaction.editReply({ embeds: [embed], components: [] });
             }
 
             const challengerChoice = challengerSumbission.customId;
             const opponentChoice = opponentSubmission.customId;
 
+            embed.data.fields[0].value = emojis[challengerChoice] + ' ' + challengerChoice.charAt(0).toUpperCase() + challengerChoice.slice(1);
+            embed.data.fields[1].value = emojis[opponentChoice] + ' ' + opponentChoice.charAt(0).toUpperCase() + opponentChoice.slice(1);
+
             let result;
             if (challengerChoice === opponentChoice) {
                 result = 'It\'s a tie!';
+                resultEmoji = '⚖️ ';
             } else if (
                 (challengerChoice === 'rock' && opponentChoice === 'scissors') ||
                 (challengerChoice === 'paper' && opponentChoice === 'rock') ||
                 (challengerChoice === 'scissors' && opponentChoice === 'paper')
             ) {
                 result = `${challenger.tag} wins!`;
+                resultEmoji = '🏆 ';
                 embed.setThumbnail(challenger.displayAvatarURL());
             } else {
                 result = `${opponent.tag} wins!`;
+                resultEmoji = '🏆 ';
                 embed.setThumbnail(opponent.displayAvatarURL());
             }
         
-            embed.setDescription(`${challenger.tag} chose ${challengerChoice}\n${opponent.tag} chose ${opponentChoice}\n\n${result}`);
+            embed.setDescription(resultEmoji + result)
+                .setFooter({ iconURL: interaction.client.user.displayAvatarURL(), text: result })
+                .setTimestamp();
+
             interaction.editReply({ embeds: [embed], components: [] });
         });
     }
